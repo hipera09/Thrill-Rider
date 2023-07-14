@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { KeyDisplay } from './utils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 
 function main() {
@@ -36,9 +38,34 @@ function main() {
         const mesh = new THREE.Mesh(planeGeo, planeMat);
         mesh.rotation.x = Math.PI * -.5;
         scene.add(mesh);
+
     }
 
     {
+        const loader = new GLTFLoader();
+        loader.load('ktm_450_exc.glb', function (gltf) {
+            const bike = gltf.scene;
+            bike.position.set(0, 0.31, 0)
+            scene.add(bike);
+        }, undefined, function (error) {
+            console.error(error);
+
+
+            const gltfAnimations = gltf.animations;
+            const mixer = new THREE.AnimationMixer(model);
+            const animationsMap = new Map();
+            gltfAnimations.filter(a => a.name != 'TPose').forEach((a) => {
+                animationsMap.set(a.name, mixer.clipAction(a));
+            });
+
+            characterControls = new CharacterControls(model, mixer, animationsMap, OrbitControls, camera, 'Idle');
+
+        });
+
+    }
+
+    {
+        //Orbit Controls
         const orbitControls = new OrbitControls(camera, renderer.domElement);
         orbitControls.enableDamping = true
         orbitControls.minDistance = 5
@@ -49,13 +76,33 @@ function main() {
     }
 
     {
-        const color = new THREE.Color(0x963d19);
+        // CONTROL KEYS
+        const keysPressed = {};
+        const keyDisplayQueue = new KeyDisplay();
+
+        document.addEventListener('keydown', (event) => {
+            keyDisplayQueue.down(event.key);
+            if (event.shiftKey && characterControls) {
+                characterControls.switchRunToggle();
+            } else {
+                keysPressed[event.key.toLowerCase()] = true;
+            }
+        }, false);
+
+        document.addEventListener('keyup', (event) => {
+            keyDisplayQueue.up(event.key);
+            keysPressed[event.key.toLowerCase()] = false;
+        }, false);
+
+        const clock = new THREE.Clock();
+
+    }
+    //0x963d19
+    {
+        const color = new THREE.Color(0xffffff);
         const intensity = 1;
-        const light = new THREE.DirectionalLight(color, intensity);
-        light.position.set(0, 10, 0);
-        light.target.position.set(-5, 0, 0);
+        const light = new THREE.AmbientLight(color, intensity);
         scene.add(light);
-        scene.add(light.target);
     }
 
     function resizeRendererToDisplaySize(renderer) {
