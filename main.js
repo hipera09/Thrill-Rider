@@ -13,32 +13,33 @@ function main() {
         const fov = 60;
         const aspect = 2;
         const near = 0.1;
-        const far = 100;
+        const far = 200;
         const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
-        camera.position.set(0, 0, 0);
         const scene = new THREE.Scene();
         scene.background = new THREE.Color('Skyblue')
         let bike;
 
+        function createGround() {
 
-        const planeSize = 400;
+            const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200);
 
-        const loader = new THREE.TextureLoader();
-        const texture = loader.load('https://threejs.org/manual/examples/resources/images/checker.png');
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.wrapT = THREE.RepeatWrapping;
-        texture.magFilter = THREE.NearestFilter;
-        const repeats = planeSize / 2;
-        texture.repeat.set(repeats, repeats);
+            let disMap = new THREE.TextureLoader().load("./textures/heightmap-01.png")
 
-        const planeGeo = new THREE.PlaneGeometry(planeSize, planeSize);
-        const planeMat = new THREE.MeshPhongMaterial({
-            map: texture
-        });
+            disMap.wrapS = disMap.wrapT = THREE.RepeatWrapping;
+            disMap.repeat.set(1, 1);
 
-        const mesh = new THREE.Mesh(planeGeo, planeMat);
-        mesh.rotation.x = Math.PI * -.5;
-        scene.add(mesh);
+            const groundMat = new THREE.MeshStandardMaterial({
+                color: 0x000000,
+                wireframe: true,
+                displacementMap: disMap,
+                displacementScale: 10,
+            });
+
+            const mesh = new THREE.Mesh(groundGeo, groundMat);
+            scene.add(mesh);
+            mesh.rotation.x = Math.PI * -.5;
+            mesh.position.y = -0.5;
+        }
 
         // Função para carregar o objeto com GLTFLoader
         function loadBike() {
@@ -46,7 +47,7 @@ function main() {
                 const loader2 = new GLTFLoader();
                 loader2.load('textures/ktm_450_exc.glb', (gltf) => {
                     bike = gltf.scene;
-                    bike.position.set(0, 0.31, 0);
+                    bike.position.set(0, 30, 0);
                     scene.add(bike);
                     resolve(bike); // Resolvendo a Promise com o objeto bike
                 }, undefined, (error) => {
@@ -54,6 +55,8 @@ function main() {
                 });
             });
         }
+
+        createGround();
 
 
         //Orbit Controls
@@ -116,7 +119,7 @@ function main() {
 
                 // Gera a posição aleatória do objeto dentro do mapa
                 const randomX = Math.random() * 100; // Largura do mapa
-                const randomZ = Math.random() * 100; // Altura do mapa
+                const randomZ = Math.random() * 100; // Comprimento do mapa
                 const position = new THREE.Vector3(randomX, 0.5, randomZ);
                 object.position.copy(position);
 
