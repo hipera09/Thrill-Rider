@@ -1,0 +1,24 @@
+{
+  "name": "thrill-rider",
+  "version": "1.0.0",
+  "description": "Um jogo 3D criado usando o motor grafico do THREE.js",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "Thrill-Rider"
+  },
+  "keywords": [
+    "game",
+    "motocross",
+    "three.js",
+    "javascript"
+  ],
+  "author": "LucasHenrique",
+  "license": "ISC",
+  "dependencies": {
+    "@dimforge/rapier3d": "^0.11.2"
+  }
+}

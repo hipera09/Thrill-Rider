@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 
+
 function main() {
     {
         const canvas = document.querySelector('#c');
@@ -39,14 +40,77 @@ function main() {
         mesh.rotation.x = Math.PI * -.5;
         scene.add(mesh);
 
+        import('@dimforge/rapier3d').then(RAPIER => {
+            // Create Ground.
+            let nsubdivs = 20;
+            let scale = new RAPIER.Vector3(70.0, 3.0, 70.0);
+            generateTerrain(nsubdivs, scale);
 
+            function generateTerrain(nsubdivs, scale) {
+                let heights = [];
+
+                // Criando um plano no Three.js
+                const threeFloor = new THREE.Mesh(
+                    new THREE.BufferGeometry(scale.x, scale.z, nsubdivs, nsubdivs),
+                    new THREE.MeshStandardMaterial({
+                        map: loadTexture('/textures/Grass_005_BaseColor.jpg'),
+                        normalMap: loadTexture('/textures/Grass_005_Normal.jpg'),
+                        aoMap: loadTexture('/textures/Grass_005_AmbientOcclusion.jpg'),
+                        roughnessMap: loadTexture('/textures/Grass_005_Roughness.jpg'),
+                        roughness: 0.6
+                    })
+                );
+
+                threeFloor.rotateX(-Math.PI / 2); // Rotaciona o plano para que fique na horizontal
+                threeFloor.receiveShadow = true; // Permite que o plano receba sombras
+                threeFloor.castShadow = true; // Permite que o plano projete sombras
+                scene.add(threeFloor); // Adiciona o plano à cena
+
+                // Adiciona dados de altura ao plano
+                const vertices = threeFloor.geometry.attributes.position.array;
+                const dx = scale.x / nsubdivs;
+                const dy = scale.z / nsubdivs;
+
+                // Armazena os dados de altura em um mapa de colunas e linhas
+                const columsRows = new Map();
+                for (let i = 0; i < vertices.length; i += 3) {
+                    // Traduz os vértices em índices de coluna / linha
+                    let row = Math.floor(Math.abs(vertices[i] + scale.x / 2) / dx);
+                    let column = Math.floor(Math.abs(vertices[i + 1] - scale.z / 2) / dy);
+                    // Gera a altura para esta coluna e linha
+                    const randomHeight = Math.random();
+                    vertices[i + 2] = scale.y * randomHeight; // Ajusta a altura do vértice com base no valor gerado
+                    // Armazena a altura
+                    if (!columsRows.get(column)) {
+                        columsRows.set(column, new Map());
+                    }
+                    columsRows.get(column).set(row, randomHeight);
+                }
+                threeFloor.geometry.computeVertexNormals();
+
+                // Armazena os dados de altura em um array de matriz em ordem de coluna principal
+                for (let i = 0; i <= nsubdivs; ++i) {
+                    for (let j = 0; j <= nsubdivs; ++j) {
+                        heights.push(columsRows.get(j).get(i));
+                    }
+
+                }
+            }
+
+            let groundBodyDesc = RAPIER.RigidBodyDesc.fixed();
+            let groundBody = World.createRigidBody(groundBodyDesc);
+            let groundCollider = RAPIER.ColliderDesc.heightfield(
+                nsubdivs, nsubdivs, new Float32Array(heights), scale
+            );
+            World.createCollider(groundCollider, groundBody.handle);
+        })
 
 
         // Função para carregar o objeto com GLTFLoader
         function loadBike() {
             return new Promise((resolve, reject) => {
                 const loader2 = new GLTFLoader();
-                loader2.load('ktm_450_exc.glb', (gltf) => {
+                loader2.load('textures/ktm_450_exc.glb', (gltf) => {
                     bike = gltf.scene;
                     bike.position.set(0, 0.31, 0);
                     scene.add(bike);
@@ -141,13 +205,13 @@ function main() {
         }
 
         // Chamada para gerar múltiplos objetos (pedras, por exemplo)
-        const stonePath = 'stone_03.glb'; // Caminho para o arquivo GLB da pedra
+        const stonePath = '/textures/stone_03.glb'; // Caminho para o arquivo GLB da pedra
         const numStones = 20; // Número de pedras a serem geradas
         const scaleStone = 3; // Fator de escala (2 para dobrar o tamanho)
         generateObjects(stonePath, numStones, scaleStone);
 
         // Chamada para gerar múltiplos objetos (árvores, por exemplo)
-        const treePath = 'oak_trees.glb'; // Caminho para o arquivo GLB da árvore
+        const treePath = '/textures/oak_trees.glb'; // Caminho para o arquivo GLB da árvore
         const numTrees = 10; // Número de árvores a serem geradas
         const scaleTree = 8; // Fato
         generateObjects(treePath, numTrees, scaleTree);
