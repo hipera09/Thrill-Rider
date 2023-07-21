@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { A, KeyDisplay } from './utils.js';
+import { KeyDisplay } from './utils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -9,16 +9,25 @@ function main() {
     {
         const canvas = document.querySelector('#c');
         const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
+        renderer.shadowMap.enabled = true;
+
+        const larguraDoMapa = 200; // Defina a largura do mapa
+        const comprimentoDoMapa = 200; // Defina o comprimento do mapa
 
         const fov = 60;
         const aspect = 2;
         const near = 0.1;
         const far = 200;
         const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+        camera.shadowMap = true;
+        camera.position.set(0, 2, 10);
         const scene = new THREE.Scene();
         scene.background = new THREE.Color('Skyblue')
         let bike;
+        const rotationSpeed = 0.02; // Ajuste a velocidade de rotação conforme necessário
+        let angle = 0;
 
+        // CRIA O CHÃO
         function createGround() {
 
             const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200);
@@ -28,14 +37,29 @@ function main() {
             disMap.wrapS = disMap.wrapT = THREE.RepeatWrapping;
             disMap.repeat.set(1, 1);
 
+            const groundTexture = new THREE.TextureLoader().load("./textures/Grass_005_BaseColor.jpg");
+            groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+            groundTexture.repeat.set(10, 10); // Ajuste a repetição conforme necessário
+
+
+
             const groundMat = new THREE.MeshStandardMaterial({
-                color: 0x000000,
-                wireframe: true,
+                map: groundTexture, // Aplique a textura ao material
                 displacementMap: disMap,
-                displacementScale: 10,
+                displacementScale: 12,
+                //receiveShadow: true, // Permita que o material receba sombra
             });
 
             const mesh = new THREE.Mesh(groundGeo, groundMat);
+            mesh.traverse((child) => {
+                if (child.material) {
+                    child.material.metalness = 0;
+                }
+                if (child.isMesh) {
+                    child.receiveShadow = true;
+                }
+            });
+            mesh.receiveShadow = true;
             scene.add(mesh);
             mesh.rotation.x = Math.PI * -.5;
             mesh.position.y = -0.5;
@@ -47,7 +71,7 @@ function main() {
                 const loader2 = new GLTFLoader();
                 loader2.load('textures/ktm_450_exc.glb', (gltf) => {
                     bike = gltf.scene;
-                    bike.position.set(0, 30, 0);
+                    bike.position.set(0, 20, 0);
                     scene.add(bike);
                     resolve(bike); // Resolvendo a Promise com o objeto bike
                 }, undefined, (error) => {
@@ -58,6 +82,26 @@ function main() {
 
         createGround();
 
+        function getHeightAtPosition(x, z) {
+            const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200); // Usando 200 segmentos em cada direção
+
+            // Normaliza as coordenadas X e Z entre -0.5 e 0.5 (pois a geometria do terreno é centrada no (0, 0))
+            const normalizedX = (x / 200) - 0.5;
+            const normalizedZ = (z / 200) - 0.5;
+
+            // Calcula a posição do vértice correspondente às coordenadas X e Z
+            const column = Math.floor((normalizedX + 0.5) * 200);
+            const row = Math.floor((normalizedZ + 0.5) * 200);
+            const vertexIndex = row * (200 + 1) + column;
+
+            // Obtém o buffer de posição da geometria
+            const positionAttribute = groundGeo.getAttribute("position");
+
+            // Obtém a altura do terreno nesse vértice
+            const alturaDoTerreno = positionAttribute.getY(vertexIndex);
+
+            return alturaDoTerreno;
+        }
 
         //Orbit Controls
         const orbitControls = new OrbitControls(camera, renderer.domElement);
@@ -74,7 +118,7 @@ function main() {
         const keyDisplayQueue = new KeyDisplay();
 
         function updateObjectPosition() {
-            const speed = 0.5; // Velocidade de movimento do objeto
+            const speed = 1; // Velocidade de movimento do objeto
 
             // Verifica tecla W (para frente)
             if (keysPressed['w']) {
@@ -83,7 +127,8 @@ function main() {
 
             // Verifica tecla A (para a esquerda)
             if (keysPressed['a']) {
-                bike.position.x += speed; // Move o objeto para a esquerda
+                angle += rotationSpeed;
+                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI);
             }
 
             // Verifica tecla S (para trás)
@@ -93,10 +138,20 @@ function main() {
 
             // Verifica tecla D (para a direita)
             if (keysPressed['d']) {
-                bike.position.x -= speed; // Move o objeto para a direita
+                angle -= rotationSpeed;
+                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI);
+            }
+
+            // Verifica tecla Space pra cima 
+            if (keysPressed[' ']) {
+                bike.position.y += speed; // Move o objeto para a cima
+            }
+
+            // Verifica tecla Shift pra baixo 
+            if (keysPressed['shift']) {
+                bike.position.y -= speed; // Move o objeto para a baixo
             }
         }
-
         document.addEventListener('keydown', (event) => {
             keyDisplayQueue.down(event.key);
             keysPressed[event.key.toLowerCase()] = true;
@@ -114,14 +169,25 @@ function main() {
             const loader3 = new GLTFLoader();
             loader3.load(objectPath, (gltf) => {
                 const object = gltf.scene;
+                object.traverse((child) => {
+                    // if (child.isMesh) child.material = angryTexture;
+                    if (child.material) {
+                        child.material.metalness = 0;
+                    }
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                    }
+                });
+
                 // Ajusta a escala do objeto
                 object.scale.set(scale, scale, scale);
 
                 // Gera a posição aleatória do objeto dentro do mapa
-                const randomX = Math.random() * 100; // Largura do mapa
-                const randomZ = Math.random() * 100; // Comprimento do mapa
-                const position = new THREE.Vector3(randomX, 0.5, randomZ);
+                const randomX = Math.random() * (larguraDoMapa - 10); // Largura do mapa
+                const randomZ = Math.random() * (comprimentoDoMapa - 10); // Comprimento do mapa
+                const position = new THREE.Vector3(randomX - 100, getHeightAtPosition(randomX, randomZ) / 10, randomZ - 100);
                 object.position.copy(position);
+                console.log(getHeightAtPosition(randomX, randomZ))
 
                 // Gera a orientação aleatória do objeto
                 const randomRotation = Math.random() * Math.PI * 2; // Ângulo aleatório em radianos
@@ -143,19 +209,21 @@ function main() {
 
         // Chamada para gerar múltiplos objetos (pedras, por exemplo)
         const stonePath = '/textures/stone_03.glb'; // Caminho para o arquivo GLB da pedra
-        const numStones = 20; // Número de pedras a serem geradas
+        const numStones = 30; // Número de pedras a serem geradas
         const scaleStone = 3; // Fator de escala (2 para dobrar o tamanho)
         generateObjects(stonePath, numStones, scaleStone);
 
         // Chamada para gerar múltiplos objetos (árvores, por exemplo)
         const treePath = '/textures/oak_trees.glb'; // Caminho para o arquivo GLB da árvore
-        const numTrees = 10; // Número de árvores a serem geradas
+        const numTrees = 15; // Número de árvores a serem geradas
         const scaleTree = 8; // Fato
         generateObjects(treePath, numTrees, scaleTree);
 
 
-        const cameraDistance = 6; // Distância da câmera em relação ao objeto
-        const cameraHeight = 3; // Altura da câmera em relação ao objeto
+        const cameraDistance = 0.4; // Distância da câmera em relação ao objeto
+        const cameraHeight = 1; // Altura da câmera em relação ao objeto
+        const cameraDirection = new THREE.Vector3(0, 0.8, 1);
+
 
         // Função de atualização da câmera
         function updateCamera() {
@@ -164,11 +232,13 @@ function main() {
                 return;
             }
             console.log(bike.position);
-            const cameraOffset = new THREE.Vector3(0, cameraHeight, -cameraDistance);
+            // Atualiza o vetor de direção da bicicleta
+            const cameraOffset = new THREE.Vector3(0, cameraHeight, cameraDistance);
+            // Define a posição da câmera para estar atrás da bicicleta na direção do vetor bikeDirection
             const cameraPosition = bike.position.clone().add(cameraOffset);
             camera.position.copy(cameraPosition);
-            camera.lookAt(bike.position);
-
+            const lookAtPosition = bike.position.clone().add(cameraDirection); // Usando o vetor cameraDirection
+            camera.lookAt(lookAtPosition);
         }
 
         // Carrega a bike usando a Promise
@@ -181,10 +251,17 @@ function main() {
 
         //0x963d19
         const color = new THREE.Color(0xffffff);
-        const intensity = 1;
-        const light = new THREE.AmbientLight(color, intensity);
+        const intensity = 0.5;
+        const light = new THREE.DirectionalLight(color, intensity);
+        light.castShadow = true;
+        light.shadowMapWidth = 1024; // Tamanho horizontal do shadow map
+        light.shadowMapHeight = 1024; // Tamanho vertical do shadow map
+        light.position.set(50, 100, 0);
+        const helper = new THREE.DirectionalLightHelper(light);
+        light.target.position.set(0, 0, 0);
         scene.add(light);
-
+        scene.add(helper);
+        scene.add(light.target);
 
         function resizeRendererToDisplaySize(renderer) {
             const canvas = renderer.domElement;
