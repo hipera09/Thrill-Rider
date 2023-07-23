@@ -26,6 +26,7 @@ function main() {
         let bike;
         const rotationSpeed = 0.02; // Ajuste a velocidade de rotação conforme necessário
         let angle = 0;
+        let isRotating = false;
 
         // CRIA O CHÃO
         function createGround() {
@@ -45,9 +46,8 @@ function main() {
 
             const groundMat = new THREE.MeshStandardMaterial({
                 map: groundTexture, // Aplique a textura ao material
-                displacementMap: disMap,
+                //displacementMap: disMap,
                 displacementScale: 12,
-                //receiveShadow: true, // Permita que o material receba sombra
             });
 
             const mesh = new THREE.Mesh(groundGeo, groundMat);
@@ -65,7 +65,7 @@ function main() {
             mesh.position.y = -0.5;
         }
 
-        //createGround();
+        createGround();
 
         //chão xadrez
 
@@ -91,24 +91,7 @@ function main() {
             scene.add(mesh);
         }
 
-        basicGround();
-        //cilindro teste
-        {
-            // Criando um cilindro
-            const radiusTop = 5;
-            const radiusBottom = 5;
-            const height = 30;
-            const radialSegments = 32;
-            const geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments);
-
-            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Cor vermelha
-
-            const cylinder = new THREE.Mesh(geometry, material);
-            cylinder.receiveShadow = true;
-            cylinder.castShadow = true;
-            scene.add(cylinder);
-
-        }
+        //basicGround();
 
         // Função para carregar o objeto com GLTFLoader
         function loadBike() {
@@ -173,7 +156,8 @@ function main() {
             // Verifica tecla A (para a esquerda)
             if (keysPressed['a']) {
                 angle += rotationSpeed;
-                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI);
+                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
+
             }
 
             // Verifica tecla S (para trás)
@@ -184,7 +168,8 @@ function main() {
             // Verifica tecla D (para a direita)
             if (keysPressed['d']) {
                 angle -= rotationSpeed;
-                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI);
+                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
+
             }
 
             // Verifica tecla Space pra cima 
@@ -230,7 +215,7 @@ function main() {
                 // Gera a posição aleatória do objeto dentro do mapa
                 const randomX = Math.random() * (larguraDoMapa - 10); // Largura do mapa
                 const randomZ = Math.random() * (comprimentoDoMapa - 10); // Comprimento do mapa
-                const position = new THREE.Vector3(randomX - 100, 0.3, randomZ - 100);
+                const position = new THREE.Vector3(randomX - 100, 0, randomZ - 100);
                 object.position.copy(position);
                 console.log(getHeightAtPosition(randomX, randomZ))
 
@@ -265,8 +250,8 @@ function main() {
         generateObjects(treePath, numTrees, scaleTree);
 
 
-        const cameraDistance = 0.4; // Distância da câmera em relação ao objeto
-        const cameraHeight = 1; // Altura da câmera em relação ao objeto
+        const cameraDistance = -0.4; // Distância da câmera em relação ao objeto
+        const cameraHeight = 1.3; // Altura da câmera em relação ao objeto
         const cameraDirection = new THREE.Vector3(0, 0.8, 1);
 
 
@@ -283,7 +268,16 @@ function main() {
             const cameraPosition = bike.position.clone().add(cameraOffset);
             camera.position.copy(cameraPosition);
             const lookAtPosition = bike.position.clone().add(cameraDirection); // Usando o vetor cameraDirection
+        }
+        function updateRotate() {
+
+            const rotationOffset = cameraDirection; // Vetor de deslocamento para trás da bike
+            rotationOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bike.rotation.y); // Rotaciona o vetor de acordo com a rotação da bike
+
+            const lookAtPosition = bike.position.clone().add(rotationOffset);
+
             camera.lookAt(lookAtPosition);
+
         }
 
         // Carrega a bike usando a Promise
@@ -294,19 +288,34 @@ function main() {
             console.error(error);
         });
 
-        //0x963d19
+        // Adicione os eventos para detectar a tecla de rotação
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'a' || 'd') {
+                isRotating = true;
+            }
+        });
+
+        document.addEventListener('keyup', (event) => {
+            if (event.key === 'a' || 'd') {
+                isRotating = false;
+            }
+        });
+
+
+        // Crie a luz direcional correspondente ao sol
         const color = new THREE.Color(0xffffff);
-        const intensity = 0.5;
-        const light = new THREE.DirectionalLight(color, intensity);
+        const intensity = 1; // Ajuste a intensidade 
+        const light = new THREE.PointLight(color, intensity);
         light.castShadow = true;
-        light.shadowMapWidth = 2048; // Tamanho horizontal do shadow map
-        light.shadowMapHeight = 2048; // Tamanho vertical do shadow map
-        light.position.set(110, 100, 0);
-        const helper = new THREE.DirectionalLightHelper(light);
-        light.target.position.set(0, 0, 0);
+        light.shadow.mapSize.width = 1024; // Tamanho horizontal do shadow map
+        light.shadow.mapSize.height = 1024; // Tamanho vertical do shadow map
+        light.position.set(200, 100, 0); // Posição da luz 
         scene.add(light);
+
+        // Helper para visualizar a direção da luz 
+        const helper = new THREE.PointLight(light);
         scene.add(helper);
-        scene.add(light.target);
+
 
         function resizeRendererToDisplaySize(renderer) {
             const canvas = renderer.domElement;
@@ -326,6 +335,10 @@ function main() {
                 camera.uptadeProjectionMatrix;
             }
             updateObjectPosition();
+            if (isRotating) {
+                const delta = clock.getDelta();
+                updateRotate();
+            }
             updateCamera();
             renderer.render(scene, camera);
             requestAnimationFrame(render);
