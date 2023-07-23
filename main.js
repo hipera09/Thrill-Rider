@@ -90,8 +90,9 @@ function main() {
             mesh.rotation.x = Math.PI * -.5;
             scene.add(mesh);
         }
-
         basicGround();
+
+
         //cilindro teste
         {
             // Criando um cilindro
@@ -182,41 +183,43 @@ function main() {
             const keyDisplayQueue = new KeyDisplay();
             const speed = 1; // Velocidade de movimento do objeto
 
-                // Verifica tecla W (para frente)
-                if (keysPressed['w']) {
-                    // Move o objeto para trás, considerando sua rotação atual
-                    bike.position.x -= speed * Math.sin(bike.rotation.y);
-                    bike.position.z -= speed * Math.cos(bike.rotation.y);
-                }
+            // Verifica tecla W (para frente)
+            if (keysPressed['w']) {
+                // Move o objeto para trás, considerando sua rotação atual
+                bike.position.x += speed;
+                bike.position.z += speed;
+                console.log(Math.sin(bike.rotation.y));
+            }
 
-                // Verifica tecla A (para a esquerda)
-                if (keysPressed['a']) {
-                    angle += rotationSpeed;
-                    bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
-                }
+            // Verifica tecla A (para a esquerda)
+            if (keysPressed['a']) {
+                angle += rotationSpeed;
+                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI);
+            }
 
-                // Verifica tecla S (para trás)
-                if (keysPressed['s']) {
-                    // Move o objeto para frente, considerando sua rotação atual
-                    bike.position.x += speed * Math.sin(bike.rotation.y);
-                    bike.position.z += speed * Math.cos(bike.rotation.y);
-                }
+            // Verifica tecla S (para trás)
+            if (keysPressed['s']) {
+                // Move o objeto para frente, considerando sua rotação atual
+                bike.position.x -= speed
+                bike.position.z -= speed
+                console.log(Math.sin(bike.rotation.y));
+            }
 
-                // Verifica tecla D (para a direita)
-                if (keysPressed['d']) {
-                    angle -= rotationSpeed;
-                    bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
-                }
+            // Verifica tecla D (para a direita)
+            if (keysPressed['d']) {
+                angle -= rotationSpeed;
+                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI);
+            }
 
-                // Verifica tecla Space pra cima 
-                if (keysPressed[' ']) {
-                    bike.position.y += speed; // Move o objeto para a cima
-                }
+            // Verifica tecla Space pra cima 
+            if (keysPressed[' ']) {
+                bike.position.y += speed; // Move o objeto para a cima
+            }
 
-                // Verifica tecla Shift pra baixo 
-                if (keysPressed['shift']) {
-                    bike.position.y -= speed; // Move o objeto para a baixo
-                }
+            // Verifica tecla Shift pra baixo 
+            if (keysPressed['shift']) {
+                bike.position.y -= speed; // Move o objeto para a baixo
+            }
             document.addEventListener('keydown', (event) => {
                 keyDisplayQueue.down(event.key);
                 keysPressed[event.key.toLowerCase()] = true;
@@ -346,7 +349,10 @@ function main() {
                 camera.uptadeProjectionMatrix;
             }
             updateBikePositionAndRotation();
-            updateCameraRotation();
+            //updateCameraRotation();
+
+            updateCamera();
+
             renderer.render(scene, camera);
             requestAnimationFrame(render);
         }
