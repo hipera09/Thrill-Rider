@@ -157,76 +157,56 @@ function main() {
         orbitControls.maxPolarAngle = Math.PI / 2 - 0.05
         orbitControls.update();
 
-        // Função para atualizar a rotação da câmera de acordo com a rotação da bike
-        function updateCameraRotation() {
-            if (!bike) {
-                console.log("A bike ainda não foi carregada");
-                return;
-            }
 
-            const cameraOffset = new THREE.Vector3(0, cameraHeight, cameraDistance);
-            const cameraPosition = bike.position.clone().add(cameraOffset);
-            camera.position.copy(cameraPosition);
+        // CONTROL KEYS
+        const keysPressed = {};
+        const keyDisplayQueue = new KeyDisplay();
 
-            const rotationOffset = new THREE.Vector3(0, 0, -1); // Vetor de deslocamento para trás da bike
-            rotationOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bike.rotation.y); // Rotaciona o vetor de acordo com a rotação da bike
-
-            const lookAtPosition = bike.position.clone().add(rotationOffset);
-            camera.lookAt(lookAtPosition);
-        }
-
-        // Função para atualizar a posição e rotação da bike
-        function updateBikePositionAndRotation() {
-            // CONTROL KEYS
-            const keysPressed = {};
-            const keyDisplayQueue = new KeyDisplay();
+        function updateObjectPosition() {
             const speed = 1; // Velocidade de movimento do objeto
 
-                // Verifica tecla W (para frente)
-                if (keysPressed['w']) {
-                    // Move o objeto para trás, considerando sua rotação atual
-                    bike.position.x -= speed * Math.sin(bike.rotation.y);
-                    bike.position.z -= speed * Math.cos(bike.rotation.y);
-                }
+            // Verifica tecla W (para frente)
+            if (keysPressed['w']) {
+                bike.position.z += speed; // Move o objeto para trás
+            }
 
-                // Verifica tecla A (para a esquerda)
-                if (keysPressed['a']) {
-                    angle += rotationSpeed;
-                    bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
-                }
+            // Verifica tecla A (para a esquerda)
+            if (keysPressed['a']) {
+                angle += rotationSpeed;
+                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI);
+            }
 
-                // Verifica tecla S (para trás)
-                if (keysPressed['s']) {
-                    // Move o objeto para frente, considerando sua rotação atual
-                    bike.position.x += speed * Math.sin(bike.rotation.y);
-                    bike.position.z += speed * Math.cos(bike.rotation.y);
-                }
+            // Verifica tecla S (para trás)
+            if (keysPressed['s']) {
+                bike.position.z -= speed; // Move o objeto para frente
+            }
 
-                // Verifica tecla D (para a direita)
-                if (keysPressed['d']) {
-                    angle -= rotationSpeed;
-                    bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
-                }
+            // Verifica tecla D (para a direita)
+            if (keysPressed['d']) {
+                angle -= rotationSpeed;
+                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI);
+            }
 
-                // Verifica tecla Space pra cima 
-                if (keysPressed[' ']) {
-                    bike.position.y += speed; // Move o objeto para a cima
-                }
+            // Verifica tecla Space pra cima 
+            if (keysPressed[' ']) {
+                bike.position.y += speed; // Move o objeto para a cima
+            }
 
-                // Verifica tecla Shift pra baixo 
-                if (keysPressed['shift']) {
-                    bike.position.y -= speed; // Move o objeto para a baixo
-                }
-            document.addEventListener('keydown', (event) => {
-                keyDisplayQueue.down(event.key);
-                keysPressed[event.key.toLowerCase()] = true;
-            },);
-
-            document.addEventListener('keyup', (event) => {
-                keyDisplayQueue.up(event.key);
-                keysPressed[event.key.toLowerCase()] = false;
-            },);
+            // Verifica tecla Shift pra baixo 
+            if (keysPressed['shift']) {
+                bike.position.y -= speed; // Move o objeto para a baixo
+            }
         }
+        document.addEventListener('keydown', (event) => {
+            keyDisplayQueue.down(event.key);
+            keysPressed[event.key.toLowerCase()] = true;
+        },);
+
+        document.addEventListener('keyup', (event) => {
+            keyDisplayQueue.up(event.key);
+            keysPressed[event.key.toLowerCase()] = false;
+        },);
+
         const clock = new THREE.Clock();
 
         // Função para carregar e gerar um objeto no mapa
@@ -293,7 +273,7 @@ function main() {
         // Função de atualização da câmera
         function updateCamera() {
             if (!bike) {
-                console.log("A bike ainda não foi carregada");
+                console.log("A bike ainda não foi carregada, trate esse caso");
                 return;
             }
             console.log(bike.position);
@@ -345,8 +325,8 @@ function main() {
                 camera.aspect = canvas.clientWidth / canvas.ClienteHeight;
                 camera.uptadeProjectionMatrix;
             }
-            updateBikePositionAndRotation();
-            updateCameraRotation();
+            updateObjectPosition();
+            updateCamera();
             renderer.render(scene, camera);
             requestAnimationFrame(render);
         }
