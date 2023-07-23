@@ -65,6 +65,51 @@ function main() {
             mesh.position.y = -0.5;
         }
 
+        //createGround();
+
+        //chão xadrez
+
+        function basicGround() {
+
+            const loader = new THREE.TextureLoader();
+            const texture = loader.load('https://threejs.org/manual/examples/resources/images/checker.png');
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.magFilter = THREE.NearestFilter;
+            texture.repeat.set(10, 10);
+
+            const groundGeo2 = new THREE.PlaneGeometry(200, 200, 200, 200);
+            const planeMat = new THREE.MeshPhongMaterial({
+                map: texture,
+                side: THREE.DoubleSide,
+            });
+
+            const mesh = new THREE.Mesh(groundGeo2, planeMat);
+            mesh.receiveShadow = true;
+            //mesh.castShadow = true;
+            mesh.rotation.x = Math.PI * -.5;
+            scene.add(mesh);
+        }
+
+        basicGround();
+        //cilindro teste
+        {
+            // Criando um cilindro
+            const radiusTop = 5;
+            const radiusBottom = 5;
+            const height = 30;
+            const radialSegments = 32;
+            const geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments);
+
+            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 }); // Cor vermelha
+
+            const cylinder = new THREE.Mesh(geometry, material);
+            cylinder.receiveShadow = true;
+            cylinder.castShadow = true;
+            scene.add(cylinder);
+
+        }
+
         // Função para carregar o objeto com GLTFLoader
         function loadBike() {
             return new Promise((resolve, reject) => {
@@ -80,7 +125,6 @@ function main() {
             });
         }
 
-        createGround();
 
         function getHeightAtPosition(x, z) {
             const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200); // Usando 200 segmentos em cada direção
@@ -102,6 +146,7 @@ function main() {
 
             return alturaDoTerreno;
         }
+
 
         //Orbit Controls
         const orbitControls = new OrbitControls(camera, renderer.domElement);
@@ -185,7 +230,7 @@ function main() {
                 // Gera a posição aleatória do objeto dentro do mapa
                 const randomX = Math.random() * (larguraDoMapa - 10); // Largura do mapa
                 const randomZ = Math.random() * (comprimentoDoMapa - 10); // Comprimento do mapa
-                const position = new THREE.Vector3(randomX - 100, getHeightAtPosition(randomX, randomZ) / 10, randomZ - 100);
+                const position = new THREE.Vector3(randomX - 100,0.3, randomZ - 100);
                 object.position.copy(position);
                 console.log(getHeightAtPosition(randomX, randomZ))
 
@@ -210,7 +255,7 @@ function main() {
         // Chamada para gerar múltiplos objetos (pedras, por exemplo)
         const stonePath = '/textures/stone_03.glb'; // Caminho para o arquivo GLB da pedra
         const numStones = 30; // Número de pedras a serem geradas
-        const scaleStone = 3; // Fator de escala (2 para dobrar o tamanho)
+        const scaleStone = 10; // Fator de escala (2 para dobrar o tamanho)
         generateObjects(stonePath, numStones, scaleStone);
 
         // Chamada para gerar múltiplos objetos (árvores, por exemplo)
@@ -254,9 +299,9 @@ function main() {
         const intensity = 0.5;
         const light = new THREE.DirectionalLight(color, intensity);
         light.castShadow = true;
-        light.shadowMapWidth = 1024; // Tamanho horizontal do shadow map
-        light.shadowMapHeight = 1024; // Tamanho vertical do shadow map
-        light.position.set(50, 100, 0);
+        light.shadowMapWidth = 2048; // Tamanho horizontal do shadow map
+        light.shadowMapHeight = 2048; // Tamanho vertical do shadow map
+        light.position.set(110, 100, 0);
         const helper = new THREE.DirectionalLightHelper(light);
         light.target.position.set(0, 0, 0);
         scene.add(light);
