@@ -73,7 +73,7 @@ function main() {
                 const loader2 = new GLTFLoader();
                 loader2.load('textures/ktm_450_exc.glb', (gltf) => {
                     bike = gltf.scene;
-                    bike.position.set(0, 20, 0);
+                    bike.position.set(0, 0.31, 0);
                     scene.add(bike);
                     resolve(bike); // Resolvendo a Promise com o objeto bike
                 }, undefined, (error) => {
@@ -120,17 +120,18 @@ function main() {
         const keyDisplayQueue = new KeyDisplay();
 
         function updateObjectPosition() {
-            const speed = 1; // Velocidade de movimento do objeto
+            const speed = 0.5; // Velocidade de movimento do objeto
 
             // Verifica tecla W (para frente)
             if (keysPressed['w']) {
-                bike.position.z += speed; // Move o objeto para trás
+                bike.position.z += speed;  // Move o objeto para trás
             }
 
             // Verifica tecla A (para a esquerda)
             if (keysPressed['a']) {
-                angle += rotationSpeed;
-                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
+                bike.position.x += speed;
+                //angle += rotationSpeed;
+                //bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
 
             }
 
@@ -141,8 +142,9 @@ function main() {
 
             // Verifica tecla D (para a direita)
             if (keysPressed['d']) {
-                angle -= rotationSpeed;
-                bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
+                bike.position.x -= speed;
+                //angle -= rotationSpeed;
+                //bike.rotation.y = THREE.MathUtils.clamp(angle, -Math.PI, Math.PI);
 
             }
 
@@ -187,8 +189,8 @@ function main() {
                 object.scale.set(scale, scale, scale);
 
                 // Gera a posição aleatória do objeto dentro do mapa
-                const randomX = Math.random() * (larguraDoMapa - 10); // Largura do mapa
-                const randomZ = Math.random() * (comprimentoDoMapa - 10); // Comprimento do mapa
+                const randomX = Math.random() * (larguraDoMapa - 20); // Largura do mapa
+                const randomZ = Math.random() * (comprimentoDoMapa - 20); // Comprimento do mapa
                 const position = new THREE.Vector3(randomX - 100, 0, randomZ - 100);
                 object.position.copy(position);
                 console.log(getHeightAtPosition(randomX, randomZ))
