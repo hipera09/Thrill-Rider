@@ -67,32 +67,6 @@ function main() {
 
         createGround();
 
-        //chão xadrez
-
-        function basicGround() {
-
-            const loader = new THREE.TextureLoader();
-            const texture = loader.load('https://threejs.org/manual/examples/resources/images/checker.png');
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.RepeatWrapping;
-            texture.magFilter = THREE.NearestFilter;
-            texture.repeat.set(10, 10);
-
-            const groundGeo2 = new THREE.PlaneGeometry(200, 200, 200, 200);
-            const planeMat = new THREE.MeshPhongMaterial({
-                map: texture,
-                side: THREE.DoubleSide,
-            });
-
-            const mesh = new THREE.Mesh(groundGeo2, planeMat);
-            mesh.receiveShadow = true;
-            //mesh.castShadow = true;
-            mesh.rotation.x = Math.PI * -.5;
-            scene.add(mesh);
-        }
-
-        //basicGround();
-
         // Função para carregar o objeto com GLTFLoader
         function loadBike() {
             return new Promise((resolve, reject) => {
@@ -240,7 +214,7 @@ function main() {
         // Chamada para gerar múltiplos objetos (pedras, por exemplo)
         const stonePath = '/textures/stone_03.glb'; // Caminho para o arquivo GLB da pedra
         const numStones = 30; // Número de pedras a serem geradas
-        const scaleStone = 10; // Fator de escala (2 para dobrar o tamanho)
+        const scaleStone = 8; // Fator de escala (2 para dobrar o tamanho)
         generateObjects(stonePath, numStones, scaleStone);
 
         // Chamada para gerar múltiplos objetos (árvores, por exemplo)
@@ -268,6 +242,7 @@ function main() {
             const cameraPosition = bike.position.clone().add(cameraOffset);
             camera.position.copy(cameraPosition);
             const lookAtPosition = bike.position.clone().add(cameraDirection); // Usando o vetor cameraDirection
+            camera.lookAt(lookAtPosition);
         }
         function updateRotate() {
 
@@ -336,7 +311,6 @@ function main() {
             }
             updateObjectPosition();
             if (isRotating) {
-                const delta = clock.getDelta();
                 updateRotate();
             }
             updateCamera();
