@@ -26,7 +26,6 @@ function main() {
         let bike;
         const rotationSpeed = 0.02; // Ajuste a velocidade de rotação conforme necessário
         let angle = 0;
-        let isRotating = false;
 
         // CRIA O CHÃO
         function createGround() {
@@ -82,6 +81,48 @@ function main() {
             });
         }
 
+        class ThirdPersonCamera {
+            constructor(params) {
+                this._params = params;
+                this._camera = params.camera;
+
+                this._currentPosition = new THREE.Vector3();
+                this._currentLookat = new THREE.Vector3();
+            }
+
+            _CalculateIdealOffset() {
+                const idealOffset = new THREE.Vector3(-15, 20, -30);
+                idealOffset.applyQuaternion(this._params.target.Rotation);
+                idealOffset.add(this._params.target.Position);
+                return idealOffset;
+            }
+
+            _CalculateIdealLookat() {
+                const idealLookat = new THREE.Vector3(0, 10, 50);
+                idealLookat.applyQuaternion(this._params.target.Rotation);
+                idealLookat.add(this._params.target.Position);
+                return idealLookat;
+            }
+
+            Update(timeElapsed) {
+                const idealOffset = this._CalculateIdealOffset();
+                const idealLookat = this._CalculateIdealLookat();
+
+                // const t = 0.05;
+                // const t = 4.0 * timeElapsed;
+                const t = 1.0 - Math.pow(0.001, timeElapsed);
+
+                this._currentPosition.lerp(idealOffset, t);
+                this._currentLookat.lerp(idealLookat, t);
+
+                this._camera.position.copy(this._currentPosition);
+                this._camera.lookAt(this._currentLookat);
+            }
+        }
+
+        this._thirdPersonCamera = new ThirdPersonCamera({
+            camera: camera,
+        });
 
         function getHeightAtPosition(x, z) {
             const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200); // Usando 200 segmentos em cada direção
@@ -228,33 +269,6 @@ function main() {
         const cameraHeight = 1.3; // Altura da câmera em relação ao objeto
         const cameraDirection = new THREE.Vector3(0, 0.8, 1);
 
-
-        // Função de atualização da câmera
-        function updateCamera() {
-            if (!bike) {
-                console.log("A bike ainda não foi carregada, trate esse caso");
-                return;
-            }
-            console.log(bike.position);
-            // Atualiza o vetor de direção da bicicleta
-            const cameraOffset = new THREE.Vector3(0, cameraHeight, cameraDistance);
-            // Define a posição da câmera para estar atrás da bicicleta na direção do vetor bikeDirection
-            const cameraPosition = bike.position.clone().add(cameraOffset);
-            camera.position.copy(cameraPosition);
-            const lookAtPosition = bike.position.clone().add(cameraDirection); // Usando o vetor cameraDirection
-            camera.lookAt(lookAtPosition);
-        }
-        function updateRotate() {
-
-            const rotationOffset = cameraDirection; // Vetor de deslocamento para trás da bike
-            rotationOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bike.rotation.y); // Rotaciona o vetor de acordo com a rotação da bike
-
-            const lookAtPosition = bike.position.clone().add(rotationOffset);
-
-            camera.lookAt(lookAtPosition);
-
-        }
-
         // Carrega a bike usando a Promise
         loadBike().then(() => {
             // Chama a função para atualizar a câmera após a bike ser carregada
@@ -302,22 +316,39 @@ function main() {
                 return needResize;
             }
         }
+        class _RAF {
+            constructor() {
+                requestAnimationFrame((t) => {
+                    if (this._previousRAF === null) {
+                        this._previousRAF = t;
+                    }
 
-        function render() {
+                    this._RAF();
+
+                    this._threejs.render(this._scene, this._camera);
+                    _Step(t - this._previousRAF);
+                    this._previousRAF = t;
+                });
+            }
+        }
+
+        // Função de atualização dos elementos da cena
+        function _Step(timeElapsed) {
+            const timeElapsedS = timeElapsed * 0.001;
+            this._thirdPersonCamera.Update(timeElapsedS);
+
             if (resizeRendererToDisplaySize(renderer)) {
                 const canvas = renderer.domElement;
                 camera.aspect = canvas.clientWidth / canvas.ClienteHeight;
                 camera.uptadeProjectionMatrix;
             }
-            updateObjectPosition();
-            if (isRotating) {
-                updateRotate();
-            }
-            updateCamera();
             renderer.render(scene, camera);
-            requestAnimationFrame(render);
+            updateObjectPosition();
         }
-        requestAnimationFrame(render);
+
+        // Inicie a animação
+        this._RAF();
+
     }
 }
-main();
+main(); 
