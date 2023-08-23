@@ -3,9 +3,12 @@ import { KeyDisplay } from './utils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-
+Ammo().then(main);
 
 function main() {
+
+    let physicsWorld, scene, camera, renderer, rigidBodies = [], tmpTrans, clock;
+
     {
         const canvas = document.querySelector('#c');
         const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
@@ -28,6 +31,19 @@ function main() {
         let angle = 0;
         let isRotating = false;
 
+        function setupPhysicsWorld() {
+            let collisionConfiguration = new Ammo.btDefaultCollisionConfiguration(),
+                dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration),
+                overlappingPairCache = new Ammo.btDbvtBroadphase(),
+                solver = new Ammo.btSequentialImpulseConstraintSolver();
+
+            physicsWorld = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
+            physicsWorld.setGravity(new Ammo.btVector3(0, -10, 0));
+        }
+
+
+        setupPhysicsWorld();
+
         // CRIA O CHÃO
         function createGround() {
 
@@ -46,7 +62,7 @@ function main() {
 
             const groundMat = new THREE.MeshStandardMaterial({
                 map: groundTexture, // Aplique a textura ao material
-                //displacementMap: disMap,
+                displacementMap: disMap,
                 displacementScale: 12,
             });
 
@@ -201,6 +217,23 @@ function main() {
 
                 // Adiciona o objeto à cena
                 scene.add(object);
+                let transform = new Ammo.btTransform();
+                transform.setIdentity();
+
+                transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+                transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
+                let motionState = new Ammo.btDefaultMotionState(transform);
+
+                let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5, scale.y * 0.5, scale.z * 0.5));
+                colShape.setMargin(0.05);
+
+                let localInertia = new Ammo.btVector3(0, 0, 0);
+                colShape.calculateLocalInertia(mass, localInertia);
+
+                let rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
+                let body = new Ammo.btRigidBody(rbInfo);
+
+                physicsWorld.addRigidBody(body);
             }, undefined, (error) => {
                 console.error(error);
             });
@@ -293,7 +326,6 @@ function main() {
         const helper = new THREE.PointLight(light);
         scene.add(helper);
 
-
         function resizeRendererToDisplaySize(renderer) {
             const canvas = renderer.domElement;
             const width = canvas.clientWidth;
@@ -305,7 +337,25 @@ function main() {
             }
         }
 
+        function updatePhysics(deltaTime) {
+            physicsWorld.stepSimulation(deltaTime, 10);
+
+            for (let i = 0; i < rigidBodies.length; i++) {
+                let objThree = rigidBodies[i];
+                let objAmmo = objThree.userData.physicsBody;
+                let ms = objAmmo.getMotionState();
+                if (ms) {
+                    ms.getWorldTransform(tmpTrans);
+                    let p = tmpTrans.getOrigin();
+                    let q = tmpTrans.getRotation();
+                    objThree.position.set(p.x(), p.y(), p.z());
+                    objThree.quaternion.set(q.x(), q.y(), q.z(), q.w());
+                }
+            }
+        }
+
         function render() {
+            let deltaTime = clock.getDelta();
             if (resizeRendererToDisplaySize(renderer)) {
                 const canvas = renderer.domElement;
                 camera.aspect = canvas.clientWidth / canvas.ClienteHeight;
@@ -316,6 +366,7 @@ function main() {
                 updateRotate();
             }
             updateCamera();
+            updatePhysics(deltaTime);
             renderer.render(scene, camera);
             requestAnimationFrame(render);
         }
