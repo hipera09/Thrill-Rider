@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { KeyDisplay } from './utils.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as CANNON from 'cannon';
 
-Ammo().then(main);
 
 function main() {
 
@@ -60,30 +60,56 @@ function main() {
             }
         });
 
-        document.addEventListener('mousemove', (event) => {
-            if (controls.isLocked) {
-              // Obtém a variação do mouse
-              const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
-              const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
-        
-              // Limita o ângulo vertical da câmera
-              const newRotationX = controls.getObject().rotation.x - movementY * 0.002;
-              controls.getObject().rotation.x = Math.max(-maxVerticalAngle, Math.min(maxVerticalAngle, newRotationX));
+        function initPhysics() {
+            physicsWorld = new CANNON.World();
+            physicsWorld.gravity.set(0, -10, 0); // Define a gravidade
+            physicsWorld.broadphase = new CANNON.NaiveBroadphase(); // Define o método de detecção de colisões
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+
+            // Carregue o mapa de altura (heightmap)
+            const disMap = new THREE.TextureLoader().load('./textures/heightmap-01.png');
+            disMap.wrapS = disMap.wrapT = THREE.RepeatWrapping;
+            disMap.repeat.set(1, 1);
+            const disMapImage = disMap.image;
+
+            canvas.width = disMapImage.width;
+            canvas.height = disMapImage.height;
+            context.drawImage(disMapImage, 0, 0, disMapImage.width, disMapImage.height);
+
+            const data = context.getImageData(0, 0, disMapImage.width, disMapImage.height).data;
+
+            const dataArray = [];
+            for (let i = 0; i < data.length; i += 4) {
+                // Converte a cor para uma altura entre -1 e 1
+                const height = ((data[i] + data[i + 1] + data[i + 2]) / 3 / 255) * 2 - 1;
+                dataArray.push(height);
             }
-          });       
 
-        function setupPhysicsWorld() {
-            let collisionConfiguration = new Ammo.btDefaultCollisionConfiguration(),
-                dispatcher = new Ammo.btCollisionDispatcher(collisionConfiguration),
-                overlappingPairCache = new Ammo.btDbvtBroadphase(),
-                solver = new Ammo.btSequentialImpulseConstraintSolver();
+            const groundShape = new CANNON.Heightfield(dataArray, {
+                elementSize: larguraDoMapa / disMapImage.width,
+            });
 
-            physicsWorld = new Ammo.btDiscreteDynamicsWorld(dispatcher, overlappingPairCache, solver, collisionConfiguration);
-            physicsWorld.setGravity(new Ammo.btVector3(0, -10, 0));
+            const groundBody = new CANNON.Body({
+                mass: 0,
+                shape: groundShape,
+            });
+
+            groundBody.position.set(0, -10, 0);
+            physicsWorld.addBody(groundBody);
         }
 
+        document.addEventListener('mousemove', (event) => {
+            if (controls.isLocked) {
+                // Obtém a variação do mouse
+                const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
+                const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
 
-        setupPhysicsWorld();
+                // Limita o ângulo vertical da câmera
+                const newRotationX = controls.getObject().rotation.x - movementY * 0.002;
+                controls.getObject().rotation.x = Math.max(-maxVerticalAngle, Math.min(maxVerticalAngle, newRotationX));
+            }
+        });
 
         // CRIA O CHÃO
         function createGround() {
@@ -104,46 +130,6 @@ function main() {
                 displacementScale: 12,
             });
 
-            let pos = { x: 0, y: 0, z: 0 };
-            let scale = { x: 50, y: 2, z: 50 };
-            let quat = { x: 0, y: 0, z: 0, w: 1 };
-            let mass = 0;
-
-            let transform = new Ammo.btTransform();
-            transform.setIdentity();
-
-            transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
-            transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
-
-            const mesh = new THREE.Mesh(groundGeo, groundMat);
-
-            const vertices = groundGeo.attributes.position.array;
-            const indices = groundGeo.index.array;
-
-            const AmmoMesh = new Ammo.btTriangleMesh(true, true);
-            AmmoMesh.setScaling(new Ammo.btVector3(scale.x, scale.y, scale.z));
-
-            for (let i = 0; i < indices.length; i += 3) {
-                const vertex1 = new Ammo.btVector3(vertices[indices[i] * 3], vertices[indices[i] * 3 + 1], vertices[indices[i] * 3 + 2]);
-                const vertex2 = new Ammo.btVector3(vertices[indices[i + 1] * 3], vertices[indices[i + 1] * 3 + 1], vertices[indices[i + 1] * 3 + 2]);
-                const vertex3 = new Ammo.btVector3(vertices[indices[i + 2] * 3], vertices[indices[i + 2] * 3 + 1], vertices[indices[i + 2] * 3 + 2]);
-
-                AmmoMesh.addTriangle(vertex1, vertex2, vertex3, false);
-            }
-
-            const colShape = new Ammo.btBvhTriangleMeshShape(AmmoMesh, true, true);
-            colShape.setMargin(0.05);
-
-            let localInertia = new Ammo.btVector3(0, 0, 0);
-            colShape.calculateLocalInertia(mass, localInertia);
-
-            let rbInfo = new Ammo.btRigidBodyConstructionInfo(0, null, colShape, localInertia);
-            let body = new Ammo.btRigidBody(rbInfo);
-
-            physicsWorld.addRigidBody(body);
-
-            groundGeo.userData.ammoMesh = AmmoMesh;
-
             mesh.traverse((child) => {
                 if (child.material) {
                     child.material.metalness = 0;
@@ -160,6 +146,7 @@ function main() {
         }
 
         createGround();
+        initPhysics();
 
         // Função para carregar o objeto com GLTFLoader
         function loadBike() {
@@ -176,33 +163,26 @@ function main() {
             });
         }
 
-
-        function getHeightAtPosition(x, z) {
-            const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200); // Usando 200 segmentos em cada direção
-
-            // Normaliza as coordenadas X e Z entre -0.5 e 0.5 (pois a geometria do terreno é centrada no (0, 0))
-            const normalizedX = (x / 200) - 0.5;
-            const normalizedZ = (z / 200) - 0.5;
-
-            // Calcula a posição do vértice correspondente às coordenadas X e Z
-            const column = Math.floor((normalizedX + 0.5) * 200);
-            const row = Math.floor((normalizedZ + 0.5) * 200);
-            const vertexIndex = row * (200 + 1) + column;
-
-            // Obtém o buffer de posição da geometria
-            const positionAttribute = groundGeo.getAttribute("position");
-
-            // Obtém a altura do terreno nesse vértice
-            const alturaDoTerreno = positionAttribute.getY(vertexIndex);
-
-            return alturaDoTerreno;
-        }
-
         // CONTROL KEYS
         const keysPressed = {};
         const keyDisplayQueue = new KeyDisplay();
 
         function updateObjectPosition() {
+            // Atualize o mundo físico (simulação)
+            physicsWorld.step(1.0 / 60.0); // Passo de simulação de 60 FPS
+
+            // Atualize a posição dos objetos Three.js baseada na simulação física
+            for (let i = 0; i < rigidBodies.length; i++) {
+                const body = rigidBodies[i];
+                const mesh = body.mesh;
+                const position = body.position;
+
+                // Atualize a posição da malha com base na posição física
+                mesh.position.copy(position);
+
+                // Atualize a rotação da malha com base na rotação física
+                mesh.quaternion.copy(body.quaternion);
+            }
             const speed = 0.5; // Velocidade de movimento do objeto
 
             // Verifica tecla W (para frente)
@@ -258,6 +238,17 @@ function main() {
             const loader3 = new GLTFLoader();
             loader3.load(objectPath, (gltf) => {
                 const object = gltf.scene;
+                const shape = new CANNON.Box(new CANNON.Vec3(scale * 0.5, scale * 0.5, scale * 0.5)); // Define a forma do corpo físico
+                const body = new CANNON.Body({ mass: 1, shape }); // Cria o corpo físico
+
+                // Configura a posição do corpo físico igual à posição da malha Three.js
+                body.position.set(object.position.x, object.position.y, object.position.z);
+
+                physicsWorld.addBody(body); // Adiciona o corpo físico ao mundo
+
+                // Salva a referência da malha e do corpo físico
+                body.mesh = object;
+                rigidBodies.push(body);
                 object.traverse((child) => {
                     // if (child.isMesh) child.material = angryTexture;
                     if (child.material) {
@@ -284,30 +275,6 @@ function main() {
 
                 // Adiciona o objeto à cena
                 scene.add(object);
-
-                let scale2 = { x: 2, y: 2, z: 2 };
-                let quat = { x: 0, y: 0, z: 0, w: 1 };
-                let mass = 1;
-
-                let transform = new Ammo.btTransform();
-                transform.setIdentity();
-                transform.setOrigin(new Ammo.btVector3(position.x, position.y, position.z));
-                transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
-                let motionState = new Ammo.btDefaultMotionState(transform);
-
-                let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale2.x * 0.5, scale2.y * 0.5, scale2.z * 0.5));
-                colShape.setMargin(0.05);
-
-                let localInertia = new Ammo.btVector3(0, 0, 0);
-                colShape.calculateLocalInertia(mass, localInertia);
-
-                let rbInfo = new Ammo.btRigidBodyConstructionInfo(mass, motionState, colShape, localInertia);
-                let body = new Ammo.btRigidBody(rbInfo);
-
-                physicsWorld.addRigidBody(body);
-
-                object.userData.physicsBody = body;
-                rigidBodies.push(object);
 
             }, undefined, (error) => {
                 console.error(error);
@@ -401,25 +368,12 @@ function main() {
             }
         }
 
-        function updatePhysics(deltaTime) {
-            physicsWorld.stepSimulation(deltaTime, 10);
-
-            for (let i = 0; i < rigidBodies.length; i++) {
-                let objThree = rigidBodies[i];
-                let objAmmo = objThree.userData.physicsBody;
-                let ms = objAmmo.getMotionState();
-                if (ms) {
-                    ms.getWorldTransform(tmpTrans);
-                    let p = tmpTrans.getOrigin();
-                    let q = tmpTrans.getRotation();
-                    objThree.position.set(p.x(), p.y(), p.z());
-                    objThree.quaternion.set(q.x(), q.y(), q.z(), q.w());
-                }
-            }
-        }
-
         function render() {
             let deltaTime = clock.getDelta();
+
+            // Atualize a simulação física
+            physicsWorld.step(this.fixedTimeStep, deltaTime, 3);
+
             if (resizeRendererToDisplaySize(renderer)) {
                 const canvas = renderer.domElement;
                 camera.aspect = canvas.clientWidth / canvas.ClienteHeight;
@@ -427,7 +381,6 @@ function main() {
             }
             updateObjectPosition();
             updateCamera();
-            updatePhysics(deltaTime);
             renderer.render(scene, camera);
             requestAnimationFrame(render);
         }
