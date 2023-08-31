@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import { KeyDisplay } from './utils.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 Ammo().then(main);
 
 function main() {
 
-    let physicsWorld, scene, camera, renderer, rigidBodies = [], tmpTrans, clock;
+    let physicsWorld, rigidBodies = [], tmpTrans, clock;
+    let maxVerticalAngle = Math.PI * 0.5; // Ângulo vertical máximo (90 graus)
+
+    tmpTrans = new Ammo.btTransform();
 
     {
         const canvas = document.querySelector('#c');
@@ -30,6 +33,44 @@ function main() {
         const rotationSpeed = 0.02; // Ajuste a velocidade de rotação conforme necessário
         let angle = 0;
         let isRotating = false;
+        const controls = new PointerLockControls(camera, document.body);
+
+        // Adicione os controles à cena
+        scene.add(controls.getObject());
+
+        // Defina um evento para quando os controles são ativados
+        controls.addEventListener('lock', () => {
+            console.log('Pointerlock ativado');
+        });
+
+        // Defina um evento para quando os controles são desativados
+        controls.addEventListener('unlock', () => {
+            console.log('Pointerlock desativado');
+        });
+
+        // Adicione um listener para o evento de clique para ativar os controles
+        document.addEventListener('click', () => {
+            controls.lock();
+        });
+
+        // Adicione um listener para o evento de tecla para desativar os controles (Esc)
+        document.addEventListener('keydown', (event) => {
+            if (event.code === 'Escape') {
+                controls.unlock();
+            }
+        });
+
+        document.addEventListener('mousemove', (event) => {
+            if (controls.isLocked) {
+              // Obtém a variação do mouse
+              const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
+              const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
+        
+              // Limita o ângulo vertical da câmera
+              const newRotationX = controls.getObject().rotation.x - movementY * 0.002;
+              controls.getObject().rotation.x = Math.max(-maxVerticalAngle, Math.min(maxVerticalAngle, newRotationX));
+            }
+          });       
 
         function setupPhysicsWorld() {
             let collisionConfiguration = new Ammo.btDefaultCollisionConfiguration(),
@@ -46,27 +87,63 @@ function main() {
 
         // CRIA O CHÃO
         function createGround() {
-
             const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200);
+            groundGeo.computeBoundingBox();
 
-            let disMap = new THREE.TextureLoader().load("./textures/heightmap-01.png")
-
+            let disMap = new THREE.TextureLoader().load("./textures/heightmap-01.png");
             disMap.wrapS = disMap.wrapT = THREE.RepeatWrapping;
             disMap.repeat.set(1, 1);
 
             const groundTexture = new THREE.TextureLoader().load("./textures/Grass_005_BaseColor.jpg");
             groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-            groundTexture.repeat.set(10, 10); // Ajuste a repetição conforme necessário
-
-
+            groundTexture.repeat.set(10, 10);
 
             const groundMat = new THREE.MeshStandardMaterial({
-                map: groundTexture, // Aplique a textura ao material
+                map: groundTexture,
                 displacementMap: disMap,
                 displacementScale: 12,
             });
 
+            let pos = { x: 0, y: 0, z: 0 };
+            let scale = { x: 50, y: 2, z: 50 };
+            let quat = { x: 0, y: 0, z: 0, w: 1 };
+            let mass = 0;
+
+            let transform = new Ammo.btTransform();
+            transform.setIdentity();
+
+            transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+            transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
+
             const mesh = new THREE.Mesh(groundGeo, groundMat);
+
+            const vertices = groundGeo.attributes.position.array;
+            const indices = groundGeo.index.array;
+
+            const AmmoMesh = new Ammo.btTriangleMesh(true, true);
+            AmmoMesh.setScaling(new Ammo.btVector3(scale.x, scale.y, scale.z));
+
+            for (let i = 0; i < indices.length; i += 3) {
+                const vertex1 = new Ammo.btVector3(vertices[indices[i] * 3], vertices[indices[i] * 3 + 1], vertices[indices[i] * 3 + 2]);
+                const vertex2 = new Ammo.btVector3(vertices[indices[i + 1] * 3], vertices[indices[i + 1] * 3 + 1], vertices[indices[i + 1] * 3 + 2]);
+                const vertex3 = new Ammo.btVector3(vertices[indices[i + 2] * 3], vertices[indices[i + 2] * 3 + 1], vertices[indices[i + 2] * 3 + 2]);
+
+                AmmoMesh.addTriangle(vertex1, vertex2, vertex3, false);
+            }
+
+            const colShape = new Ammo.btBvhTriangleMeshShape(AmmoMesh, true, true);
+            colShape.setMargin(0.05);
+
+            let localInertia = new Ammo.btVector3(0, 0, 0);
+            colShape.calculateLocalInertia(mass, localInertia);
+
+            let rbInfo = new Ammo.btRigidBodyConstructionInfo(0, null, colShape, localInertia);
+            let body = new Ammo.btRigidBody(rbInfo);
+
+            physicsWorld.addRigidBody(body);
+
+            groundGeo.userData.ammoMesh = AmmoMesh;
+
             mesh.traverse((child) => {
                 if (child.material) {
                     child.material.metalness = 0;
@@ -75,9 +152,10 @@ function main() {
                     child.receiveShadow = true;
                 }
             });
+
             mesh.receiveShadow = true;
             scene.add(mesh);
-            mesh.rotation.x = Math.PI * -.5;
+            mesh.rotation.x = Math.PI * -0.5;
             mesh.position.y = -0.5;
         }
 
@@ -119,17 +197,6 @@ function main() {
 
             return alturaDoTerreno;
         }
-
-
-        //Orbit Controls
-        const orbitControls = new OrbitControls(camera, renderer.domElement);
-        orbitControls.enableDamping = true
-        orbitControls.minDistance = 5
-        orbitControls.maxDistance = 15
-        orbitControls.enablePan = false
-        orbitControls.maxPolarAngle = Math.PI / 2 - 0.05
-        orbitControls.update();
-
 
         // CONTROL KEYS
         const keysPressed = {};
@@ -207,7 +274,7 @@ function main() {
                 // Gera a posição aleatória do objeto dentro do mapa
                 const randomX = Math.random() * (larguraDoMapa - 20); // Largura do mapa
                 const randomZ = Math.random() * (comprimentoDoMapa - 20); // Comprimento do mapa
-                const position = new THREE.Vector3(randomX - 100, 0, randomZ - 100);
+                const position = new THREE.Vector3(randomX - 100, 10, randomZ - 100);
                 object.position.copy(position);
                 console.log(getHeightAtPosition(randomX, randomZ))
 
@@ -217,14 +284,18 @@ function main() {
 
                 // Adiciona o objeto à cena
                 scene.add(object);
+
+                let scale2 = { x: 2, y: 2, z: 2 };
+                let quat = { x: 0, y: 0, z: 0, w: 1 };
+                let mass = 1;
+
                 let transform = new Ammo.btTransform();
                 transform.setIdentity();
-
-                transform.setOrigin(new Ammo.btVector3(pos.x, pos.y, pos.z));
+                transform.setOrigin(new Ammo.btVector3(position.x, position.y, position.z));
                 transform.setRotation(new Ammo.btQuaternion(quat.x, quat.y, quat.z, quat.w));
                 let motionState = new Ammo.btDefaultMotionState(transform);
 
-                let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale.x * 0.5, scale.y * 0.5, scale.z * 0.5));
+                let colShape = new Ammo.btBoxShape(new Ammo.btVector3(scale2.x * 0.5, scale2.y * 0.5, scale2.z * 0.5));
                 colShape.setMargin(0.05);
 
                 let localInertia = new Ammo.btVector3(0, 0, 0);
@@ -234,6 +305,10 @@ function main() {
                 let body = new Ammo.btRigidBody(rbInfo);
 
                 physicsWorld.addRigidBody(body);
+
+                object.userData.physicsBody = body;
+                rigidBodies.push(object);
+
             }, undefined, (error) => {
                 console.error(error);
             });
@@ -270,26 +345,15 @@ function main() {
                 console.log("A bike ainda não foi carregada, trate esse caso");
                 return;
             }
-            console.log(bike.position);
+            //console.log(bike.position);
             // Atualiza o vetor de direção da bicicleta
             const cameraOffset = new THREE.Vector3(0, cameraHeight, cameraDistance);
             // Define a posição da câmera para estar atrás da bicicleta na direção do vetor bikeDirection
             const cameraPosition = bike.position.clone().add(cameraOffset);
             camera.position.copy(cameraPosition);
             const lookAtPosition = bike.position.clone().add(cameraDirection); // Usando o vetor cameraDirection
-            camera.lookAt(lookAtPosition);
+            //camera.lookAt(lookAtPosition);
         }
-        function updateRotate() {
-
-            const rotationOffset = cameraDirection; // Vetor de deslocamento para trás da bike
-            rotationOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), bike.rotation.y); // Rotaciona o vetor de acordo com a rotação da bike
-
-            const lookAtPosition = bike.position.clone().add(rotationOffset);
-
-            camera.lookAt(lookAtPosition);
-
-        }
-
         // Carrega a bike usando a Promise
         loadBike().then(() => {
             // Chama a função para atualizar a câmera após a bike ser carregada
@@ -362,9 +426,6 @@ function main() {
                 camera.uptadeProjectionMatrix;
             }
             updateObjectPosition();
-            if (isRotating) {
-                updateRotate();
-            }
             updateCamera();
             updatePhysics(deltaTime);
             renderer.render(scene, camera);

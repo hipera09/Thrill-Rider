@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { KeyDisplay } from './utils.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
 
 function main() {
   const canvas = document.querySelector('#c');
@@ -162,7 +163,7 @@ function main() {
     const cameraDistance = 0.4;
     const cameraHeight = 1;
     const cameraDirection = new THREE.Vector3(0, 0.8, 1);
-
+    }
     function updateCamera() {
       // ... Código anterior ...
     }
@@ -203,7 +204,7 @@ function main() {
       renderer.render(scene, camera);
       requestAnimationFrame(render);
     }
-
+  
     // Inicia a renderização
     requestAnimationFrame(render);
   }
