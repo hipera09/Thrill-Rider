@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { KeyDisplay } from './utils.js';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import * as CANNON from 'cannon';
+import * as CANNON from './node_modules/cannon-es/dist/cannon-es.js';
 
 
 function main() {
@@ -10,7 +10,6 @@ function main() {
     let physicsWorld, rigidBodies = [], tmpTrans, clock;
     let maxVerticalAngle = Math.PI * 0.5; // Ângulo vertical máximo (90 graus)
 
-    tmpTrans = new Ammo.btTransform();
 
     {
         const canvas = document.querySelector('#c');
