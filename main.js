@@ -7,9 +7,16 @@ import * as CANNON from './node_modules/cannon-es/dist/cannon-es.js';
 
 function main() {
 
-    let physicsWorld, rigidBodies = [], tmpTrans, clock;
-    let maxVerticalAngle = Math.PI * 0.5; // Ângulo vertical máximo (90 graus)
+    const world = new CANNON.World({
+        gravity: new CANNON.Vec3(0, -10, 0)
+    });
 
+    let bikeBody;
+    let boxBody;
+    let threeObject;
+    let bike;
+
+    const timeStep = 1 / 60;
 
     {
         const canvas = document.querySelector('#c');
@@ -28,10 +35,6 @@ function main() {
         camera.position.set(0, 2, 10);
         const scene = new THREE.Scene();
         scene.background = new THREE.Color('Skyblue')
-        let bike;
-        const rotationSpeed = 0.02; // Ajuste a velocidade de rotação conforme necessário
-        let angle = 0;
-        let isRotating = false;
         const controls = new PointerLockControls(camera, document.body);
 
         // Adicione os controles à cena
@@ -59,57 +62,6 @@ function main() {
             }
         });
 
-        function initPhysics() {
-            physicsWorld = new CANNON.World();
-            physicsWorld.gravity.set(0, -10, 0); // Define a gravidade
-            physicsWorld.broadphase = new CANNON.NaiveBroadphase(); // Define o método de detecção de colisões
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-
-            // Carregue o mapa de altura (heightmap)
-            const disMap = new THREE.TextureLoader().load('./textures/heightmap-01.png');
-            disMap.wrapS = disMap.wrapT = THREE.RepeatWrapping;
-            disMap.repeat.set(1, 1);
-            const disMapImage = disMap.image;
-
-            canvas.width = disMapImage.width;
-            canvas.height = disMapImage.height;
-            context.drawImage(disMapImage, 0, 0, disMapImage.width, disMapImage.height);
-
-            const data = context.getImageData(0, 0, disMapImage.width, disMapImage.height).data;
-
-            const dataArray = [];
-            for (let i = 0; i < data.length; i += 4) {
-                // Converte a cor para uma altura entre -1 e 1
-                const height = ((data[i] + data[i + 1] + data[i + 2]) / 3 / 255) * 2 - 1;
-                dataArray.push(height);
-            }
-
-            const groundShape = new CANNON.Heightfield(dataArray, {
-                elementSize: larguraDoMapa / disMapImage.width,
-            });
-
-            const groundBody = new CANNON.Body({
-                mass: 0,
-                shape: groundShape,
-            });
-
-            groundBody.position.set(0, -10, 0);
-            physicsWorld.addBody(groundBody);
-        }
-
-        document.addEventListener('mousemove', (event) => {
-            if (controls.isLocked) {
-                // Obtém a variação do mouse
-                const movementX = event.movementX || event.mozMovementX || event.webkitMovementX || 0;
-                const movementY = event.movementY || event.mozMovementY || event.webkitMovementY || 0;
-
-                // Limita o ângulo vertical da câmera
-                const newRotationX = controls.getObject().rotation.x - movementY * 0.002;
-                controls.getObject().rotation.x = Math.max(-maxVerticalAngle, Math.min(maxVerticalAngle, newRotationX));
-            }
-        });
-
         // CRIA O CHÃO
         function createGround() {
             const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200);
@@ -125,9 +77,12 @@ function main() {
 
             const groundMat = new THREE.MeshStandardMaterial({
                 map: groundTexture,
-                displacementMap: disMap,
+                //displacementMap: disMap,
                 displacementScale: 12,
             });
+
+            mesh.geometry = groundGeo;
+            mesh.material = groundMat;
 
             mesh.traverse((child) => {
                 if (child.material) {
@@ -143,9 +98,17 @@ function main() {
             mesh.rotation.x = Math.PI * -0.5;
             mesh.position.y = -0.5;
         }
-
+        const mesh = new THREE.Mesh();
         createGround();
-        initPhysics();
+
+        const groundBody = new CANNON.Body({
+            shape: new CANNON.Plane(),
+            //mass: 03
+            type: CANNON.Body.STATIC
+        });
+
+        world.addBody(groundBody);
+        groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
 
         // Função para carregar o objeto com GLTFLoader
         function loadBike() {
@@ -162,26 +125,18 @@ function main() {
             });
         }
 
+
+        const bikeBody = new CANNON.Body({
+            shape: new CANNON.Box(new CANNON.Vec3(2, 2, 2)),
+            mass: 5
+        });
+        world.addBody(bikeBody);
+
         // CONTROL KEYS
         const keysPressed = {};
         const keyDisplayQueue = new KeyDisplay();
 
         function updateObjectPosition() {
-            // Atualize o mundo físico (simulação)
-            physicsWorld.step(1.0 / 60.0); // Passo de simulação de 60 FPS
-
-            // Atualize a posição dos objetos Three.js baseada na simulação física
-            for (let i = 0; i < rigidBodies.length; i++) {
-                const body = rigidBodies[i];
-                const mesh = body.mesh;
-                const position = body.position;
-
-                // Atualize a posição da malha com base na posição física
-                mesh.position.copy(position);
-
-                // Atualize a rotação da malha com base na rotação física
-                mesh.quaternion.copy(body.quaternion);
-            }
             const speed = 0.5; // Velocidade de movimento do objeto
 
             // Verifica tecla W (para frente)
@@ -237,17 +192,6 @@ function main() {
             const loader3 = new GLTFLoader();
             loader3.load(objectPath, (gltf) => {
                 const object = gltf.scene;
-                const shape = new CANNON.Box(new CANNON.Vec3(scale * 0.5, scale * 0.5, scale * 0.5)); // Define a forma do corpo físico
-                const body = new CANNON.Body({ mass: 1, shape }); // Cria o corpo físico
-
-                // Configura a posição do corpo físico igual à posição da malha Three.js
-                body.position.set(object.position.x, object.position.y, object.position.z);
-
-                physicsWorld.addBody(body); // Adiciona o corpo físico ao mundo
-
-                // Salva a referência da malha e do corpo físico
-                body.mesh = object;
-                rigidBodies.push(body);
                 object.traverse((child) => {
                     // if (child.isMesh) child.material = angryTexture;
                     if (child.material) {
@@ -260,13 +204,11 @@ function main() {
 
                 // Ajusta a escala do objeto
                 object.scale.set(scale, scale, scale);
-
                 // Gera a posição aleatória do objeto dentro do mapa
                 const randomX = Math.random() * (larguraDoMapa - 20); // Largura do mapa
                 const randomZ = Math.random() * (comprimentoDoMapa - 20); // Comprimento do mapa
-                const position = new THREE.Vector3(randomX - 100, 10, randomZ - 100);
+                const position = new THREE.Vector3(randomX - 100, 0.31, randomZ - 100);
                 object.position.copy(position);
-                console.log(getHeightAtPosition(randomX, randomZ))
 
                 // Gera a orientação aleatória do objeto
                 const randomRotation = Math.random() * Math.PI * 2; // Ângulo aleatório em radianos
@@ -274,6 +216,17 @@ function main() {
 
                 // Adiciona o objeto à cena
                 scene.add(object);
+
+                threeObject = object;
+
+                // Cria o corpo rígido do Cannon.js para o objeto
+                const boxShape = new CANNON.Box(new CANNON.Vec3(4, 4, 4)); // Você pode ajustar o tamanho do corpo
+                const boxBody = new CANNON.Body({ mass: 1, shape: boxShape });
+                boxBody.position.copy(position); // Copia a posição do objeto Three.js para o corpo Cannon.js
+                boxBody.quaternion.copy(object.quaternion); // Copia a rotação do objeto Three.js para o corpo Cannon.js
+
+                // Adiciona o corpo rígido ao mundo Cannon.js
+                world.addBody(boxBody);
 
             }, undefined, (error) => {
                 console.error(error);
@@ -311,7 +264,6 @@ function main() {
                 console.log("A bike ainda não foi carregada, trate esse caso");
                 return;
             }
-            //console.log(bike.position);
             // Atualiza o vetor de direção da bicicleta
             const cameraOffset = new THREE.Vector3(0, cameraHeight, cameraDistance);
             // Define a posição da câmera para estar atrás da bicicleta na direção do vetor bikeDirection
@@ -328,18 +280,18 @@ function main() {
             console.error(error);
         });
 
-        // Adicione os eventos para detectar a tecla de rotação
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'a' || 'd') {
-                isRotating = true;
-            }
-        });
+        // // Adicione os eventos para detectar a tecla de rotação
+        // document.addEventListener('keydown', (event) => {
+        //     if (event.key === 'a' || 'd') {
+        //         isRotating = true;
+        //     }
+        // });
 
-        document.addEventListener('keyup', (event) => {
-            if (event.key === 'a' || 'd') {
-                isRotating = false;
-            }
-        });
+        // document.addEventListener('keyup', (event) => {
+        //     if (event.key === 'a' || 'd') {
+        //         isRotating = false;
+        //     }
+        // });
 
 
         // Crie a luz direcional correspondente ao sol
@@ -367,23 +319,51 @@ function main() {
             }
         }
 
-        function render() {
-            let deltaTime = clock.getDelta();
+        // Chamada para carregar a bike usando a Promise
+        loadBike().then(() => {
+            // Agora que a bike está carregada, podemos iniciar a função de renderização
+            requestAnimationFrame(render);
+        }).catch((error) => {
+            console.error(error);
+        });
 
-            // Atualize a simulação física
-            physicsWorld.step(this.fixedTimeStep, deltaTime, 3);
+        function render() {
+            world.step(timeStep);
 
             if (resizeRendererToDisplaySize(renderer)) {
                 const canvas = renderer.domElement;
                 camera.aspect = canvas.clientWidth / canvas.ClienteHeight;
                 camera.uptadeProjectionMatrix;
             }
+
+            // Chamada para carregar a bike usando a Promise
+            loadBike().then(() => {
+                // Agora que a bike está carregada, podemos copiar sua posição e rotação
+                bikeBody.position.copy(bike.position);
+                bikeBody.quaternion.copy(bike.quaternion);
+            }).catch((error) => {
+                console.error(error);
+            });
+
+            // console.log(bike.position);
+            mesh.position.copy(groundBody.position);
+            mesh.quaternion.copy(groundBody.quaternion);
+
+            if (bike) {
+                bikeBody.position.copy(bike.position);
+                bikeBody.quaternion.copy(bike.quaternion);
+            }
+
+            if (threeObject && boxBody) {
+                threeObject.position.copy(boxBody.position);
+                threeObject.quaternion.copy(boxBody.quaternion);
+            }
+
             updateObjectPosition();
             updateCamera();
             renderer.render(scene, camera);
             requestAnimationFrame(render);
         }
-        requestAnimationFrame(render);
     }
 }
 main();
