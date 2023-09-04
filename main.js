@@ -23,8 +23,8 @@ function main() {
         const renderer = new THREE.WebGLRenderer({ antialias: true, canvas });
         renderer.shadowMap.enabled = true;
 
-        const larguraDoMapa = 200; // Defina a largura do mapa
-        const comprimentoDoMapa = 200; // Defina o comprimento do mapa
+        const larguraDoMapa = 100; // Defina a largura do mapa
+        const comprimentoDoMapa = 100; // Defina o comprimento do mapa
 
         const fov = 60;
         const aspect = 2;
@@ -64,7 +64,7 @@ function main() {
 
         // CRIA O CHÃO
         function createGround() {
-            const groundGeo = new THREE.PlaneGeometry(200, 200, 200, 200);
+            const groundGeo = new THREE.PlaneGeometry(100, 100, 100, 100);
             groundGeo.computeBoundingBox();
 
             let disMap = new THREE.TextureLoader().load("./textures/heightmap-01.png");
@@ -207,7 +207,7 @@ function main() {
                 // Gera a posição aleatória do objeto dentro do mapa
                 const randomX = Math.random() * (larguraDoMapa - 20); // Largura do mapa
                 const randomZ = Math.random() * (comprimentoDoMapa - 20); // Comprimento do mapa
-                const position = new THREE.Vector3(randomX - 100, 0.31, randomZ - 100);
+                const position = new THREE.Vector3(randomX - 80, 0.31, randomZ - 80);
                 object.position.copy(position);
 
                 // Gera a orientação aleatória do objeto
@@ -221,7 +221,7 @@ function main() {
 
                 // Cria o corpo rígido do Cannon.js para o objeto
                 const boxShape = new CANNON.Box(new CANNON.Vec3(4, 4, 4)); // Você pode ajustar o tamanho do corpo
-                const boxBody = new CANNON.Body({ mass: 1, shape: boxShape });
+                const boxBody = new CANNON.Body({ type: CANNON.Body.STATIC, shape: boxShape });
                 boxBody.position.copy(position); // Copia a posição do objeto Three.js para o corpo Cannon.js
                 boxBody.quaternion.copy(object.quaternion); // Copia a rotação do objeto Three.js para o corpo Cannon.js
 
@@ -242,13 +242,13 @@ function main() {
 
         // Chamada para gerar múltiplos objetos (pedras, por exemplo)
         const stonePath = '/textures/stone_03.glb'; // Caminho para o arquivo GLB da pedra
-        const numStones = 30; // Número de pedras a serem geradas
+        const numStones = 10; // Número de pedras a serem geradas
         const scaleStone = 8; // Fator de escala (2 para dobrar o tamanho)
         generateObjects(stonePath, numStones, scaleStone);
 
         // Chamada para gerar múltiplos objetos (árvores, por exemplo)
         const treePath = '/textures/oak_trees.glb'; // Caminho para o arquivo GLB da árvore
-        const numTrees = 15; // Número de árvores a serem geradas
+        const numTrees = 5; // Número de árvores a serem geradas
         const scaleTree = 8; // Fato
         generateObjects(treePath, numTrees, scaleTree);
 
@@ -362,7 +362,10 @@ function main() {
             updateObjectPosition();
             updateCamera();
             renderer.render(scene, camera);
+            // Configurar o próximo quadro para 30fps
+
             requestAnimationFrame(render);
+
         }
     }
 }
